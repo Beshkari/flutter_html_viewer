@@ -147,6 +147,7 @@ class _HtmlViewerState extends State<HtmlViewer> {
         child: Listener(
           onPointerUp: (_) {},
           child: SelectableText.rich(
+			TextSpan(style: baseStyle, children: spans),
             key: selectableTextKey,
             onSelectionChanged: (selection, cause) {
               if (!selection.isCollapsed) {
@@ -161,7 +162,6 @@ class _HtmlViewerState extends State<HtmlViewer> {
             },
             textAlign: widget.textAlign,
             selectionControls: widget.selectionControls,
-            textSpan: TextSpan(style: baseStyle, children: spans),
           ),
         ),
       ),
@@ -316,7 +316,7 @@ class _HtmlViewerState extends State<HtmlViewer> {
     List<InlineSpan> spans = [];
 
     if (node is dom.Text) {
-      String textStr = node.text ?? '';
+      String textStr = node.text;
       int localLength = textStr.length;
 
       // Find highlights that intersect with this text node

@@ -1,9 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart';
 import 'package:share/share.dart';
 import 'highlight_bottom_sheet.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 
 /// Represents what data is needed to initiate a highlight.
 class HighlightRequest {
