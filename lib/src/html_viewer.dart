@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,36 +31,60 @@ class _Boundary {
   _Boundary(this.index, this.isStart, this.highlight);
 }
 
-/// A callback signature for handling link taps in <a> tags.
+/// Callback for handling link taps in <a> tags.
 typedef LinkTapCallback = void Function(String url);
 
 /// The main widget for rendering HTML content with highlight and selection features.
 class HtmlViewer extends StatefulWidget {
-  final String htmlContent;
-  final String fontFamily;
-  final double fontSize;
-  final Color textColor;
-  final double lineHeight;
-  final Color backgroundColor;
-  final TextAlign textAlign;
-  final dynamic bookData;
-  final String bookId;
+  /// Any user metadata or additional data you want to pass (replaces bookData & bookId).
+  final dynamic metaData;
+
+  /// Page number if needed; left for demonstration, but you can remove if not needed.
   final int pageNumber;
+
+  /// The raw HTML string to be displayed.
+  final String htmlContent;
+
+  /// Font family used in the displayed text.
+  final String fontFamily;
+
+  /// Font size used in the displayed text.
+  final double fontSize;
+
+  /// Text color.
+  final Color textColor;
+
+  /// The line height for the displayed text.
+  final double lineHeight;
+
+  /// Background color of the container.
+  final Color backgroundColor;
+
+  /// Text alignment (e.g. left, right, justify).
+  final TextAlign textAlign;
+
+  /// BuildContext if needed for certain operations.
   final BuildContext context;
+
+  /// List of search highlights (e.g. from user input).
   final List<Map<String, dynamic>>? searchHighlights;
+
+  /// List of user highlights, with color, note, etc.
   final List<HighlightRange> userHighlights;
 
-  /// A custom selection control for managing selection toolbar.
+  /// A custom selection control for text selection toolbar.
   final TextSelectionControls selectionControls;
 
-  /// A callback for handling link taps in <a>.
+  /// Callback when a link (<a>) is tapped.
   final LinkTapCallback? onLinkTap;
 
-  /// Direction of the text (RTL or LTR).
+  /// Text direction if you want to enforce LTR or RTL.
   final TextDirection textDirection;
 
   const HtmlViewer({
     Key? key,
+    required this.metaData,
+    required this.pageNumber,
     required this.htmlContent,
     required this.fontFamily,
     required this.fontSize,
@@ -67,9 +92,6 @@ class HtmlViewer extends StatefulWidget {
     required this.lineHeight,
     required this.backgroundColor,
     required this.textAlign,
-    required this.bookData,
-    required this.pageNumber,
-    required this.bookId,
     required this.context,
     required this.selectionControls,
     required this.searchHighlights,
@@ -109,7 +131,6 @@ class _HtmlViewerState extends State<HtmlViewer> {
     if (widget.userHighlights.isNotEmpty) {
       combinedHighlights.addAll(widget.userHighlights);
     }
-
     if (widget.searchHighlights != null && widget.searchHighlights!.isNotEmpty) {
       final keyword = widget.searchHighlights![0]['keyword'] as String;
       int startIndex = 0;
@@ -147,8 +168,9 @@ class _HtmlViewerState extends State<HtmlViewer> {
         child: Listener(
           onPointerUp: (_) {},
           child: SelectableText.rich(
-			TextSpan(style: baseStyle, children: spans),
             key: selectableTextKey,
+            // In newer flutter versions, must pass the main textSpan as positional arg
+            TextSpan(style: baseStyle, children: spans),
             onSelectionChanged: (selection, cause) {
               if (!selection.isCollapsed) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -168,7 +190,7 @@ class _HtmlViewerState extends State<HtmlViewer> {
     );
   }
 
-  /// Flattens InlineSpans into a plain string, for highlight indexing.
+  /// Flatten InlineSpans into a plain string, used for indexing highlights.
   String _flattenInlineSpans(List<InlineSpan> spans) {
     StringBuffer buffer = StringBuffer();
     for (final span in spans) {
@@ -179,7 +201,7 @@ class _HtmlViewerState extends State<HtmlViewer> {
     return buffer.toString();
   }
 
-  /// Parses a color string like #RRGGBB or #AARRGGBB into a Color.
+  /// Parse color from #RRGGBB or #AARRGGBB
   Color? _parseColor(String colorStr) {
     if (colorStr.startsWith('#')) {
       final hex = colorStr.replaceAll('#', '');
@@ -192,7 +214,7 @@ class _HtmlViewerState extends State<HtmlViewer> {
     return null;
   }
 
-  /// Ensures the highlight boundaries are correct with the final text indexing.
+  /// Adjust highlight boundaries if there's mismatch in indexing
   HighlightRange adjustHighlightBoundaries(HighlightRange hl, String completeText) {
     int safeEnd = hl.endIndex <= completeText.length ? hl.endIndex : completeText.length;
     String extracted = completeText.substring(hl.startIndex, safeEnd);
@@ -215,7 +237,7 @@ class _HtmlViewerState extends State<HtmlViewer> {
     return hl;
   }
 
-  /// Apply highlight styling (background color, underline if there's a note).
+  /// Apply highlight styling (background color, underline if there's a note)
   List<InlineSpan> _applyUserHighlightsToText(String text, TextStyle style, List<HighlightRange> highlights) {
     List<InlineSpan> spans = [];
     List<_Boundary> boundaries = [];
@@ -306,20 +328,20 @@ class _HtmlViewerState extends State<HtmlViewer> {
     return spans;
   }
 
-  /// Recursively parse DOM nodes to InlineSpans, handling highlights as well.
+  /// Recursively parse DOM node to InlineSpans, including highlights
   List<InlineSpan> _parseNodeToSpansWithHighlights(
-    dom.Node node,
-    TextStyle currentStyle,
-    int offset,
-    List<HighlightRange> globalHighlights,
-  ) {
+      dom.Node node,
+      TextStyle currentStyle,
+      int offset,
+      List<HighlightRange> globalHighlights,
+      ) {
     List<InlineSpan> spans = [];
 
     if (node is dom.Text) {
-      String textStr = node.text;
+      String textStr = node.text ?? '';
       int localLength = textStr.length;
 
-      // Find highlights that intersect with this text node
+      // find highlights that intersect with this text node
       List<HighlightRange> localHighlights = [];
       for (var hl in globalHighlights) {
         if (hl.endIndex > offset && hl.startIndex < offset + localLength) {
@@ -337,7 +359,6 @@ class _HtmlViewerState extends State<HtmlViewer> {
         }
       }
 
-      // Apply highlights to this text segment
       spans.addAll(_applyUserHighlightsToText(textStr, currentStyle, localHighlights));
       return spans;
     } else if (node is dom.Element) {
@@ -378,7 +399,6 @@ class _HtmlViewerState extends State<HtmlViewer> {
           );
           return spans;
         case 'a':
-          // Link handling
           final href = node.attributes['href'] ?? '';
           TapGestureRecognizer tapRecognizer = TapGestureRecognizer()
             ..onTap = () {
@@ -409,7 +429,6 @@ class _HtmlViewerState extends State<HtmlViewer> {
           return spans;
       }
 
-      // Parse child nodes recursively
       int currentOffset = offset;
       for (var child in node.nodes) {
         List<InlineSpan> childSpans = _parseNodeToSpansWithHighlights(
@@ -424,11 +443,9 @@ class _HtmlViewerState extends State<HtmlViewer> {
       }
       return spans;
     }
-
     return spans;
   }
 
-  /// Shows a dialog when a highlighted segment is tapped, displaying the note if any.
   void _showSpanDialog(BuildContext context, String spanContent, String note) {
     showDialog(
       context: context,

@@ -1,20 +1,28 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share/share.dart';
 import 'highlight_bottom_sheet.dart';
-import 'package:flutter/foundation.dart' show ValueListenable;
 
-/// Represents what data is needed to initiate a highlight.
+/// Represents highlight request info.
 class HighlightRequest {
-  final String bookId;
+  /// just a metaData
+  final dynamic metaData;
+
+  /// Optional page number if you still need it
   final int pageNumber;
+
+  /// Full page text for indexing or footnotes
   final String fullPageText;
+
+  /// Start & end index in the text
   final int startIndex;
   final int endIndex;
+
+  /// The selected text segment
   final String selectedText;
 
   HighlightRequest({
-    required this.bookId,
+    required this.metaData,
     required this.pageNumber,
     required this.fullPageText,
     required this.startIndex,
@@ -25,38 +33,45 @@ class HighlightRequest {
 
 /// A builder function that creates a custom bottom sheet (or any widget) to handle highlight.
 typedef HighlightSheetBuilder = Widget Function(
-  BuildContext context,
-  HighlightRequest highlightRequest,
-);
+    BuildContext context,
+    HighlightRequest highlightRequest,
+    );
 
 /// A callback if you want to handle highlight logic entirely yourself.
 typedef OnHighlightRequested = void Function(HighlightRequest request);
 
 /// A custom selection controls class that shows a toolbar with highlight, search, share, copy, etc.
 class CustomTextSelectionControls extends MaterialTextSelectionControls {
-  final dynamic bookData;
-  final String bookId;
+  /// a single metaData
+  final dynamic metaData;
+
+  /// Optional pageNumber if still needed
   final int pageNumber;
+
+  /// The full text content
   final String fullPageText;
+
+  /// Called whenever a highlight is successfully done
   final VoidCallback onHighlightDone;
-  final Function(String) onSearchInBook;
+
+  /// Searching callbacks for external engines
+  final Function(String) onSearchInContent;
   final Function(String) onSearchInGoogle;
   final Function(String) onSearchInDictionary;
   final Function(String) onSearchInBing;
 
-  /// If provided, you can display a custom bottom sheet for highlights.
+  /// If provided, you can display a custom bottom sheet for highlights
   final HighlightSheetBuilder? highlightSheetBuilder;
 
-  /// If provided, you can handle highlight yourself without showing a default UI.
+  /// If provided, you can handle highlight yourself without showing a default UI
   final OnHighlightRequested? onHighlightRequested;
 
   CustomTextSelectionControls({
-    required this.bookData,
-    required this.bookId,
+    required this.metaData,
     required this.pageNumber,
     required this.fullPageText,
     required this.onHighlightDone,
-    required this.onSearchInBook,
+    required this.onSearchInContent,
     required this.onSearchInGoogle,
     required this.onSearchInDictionary,
     required this.onSearchInBing,
@@ -70,27 +85,25 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
 
   @override
   Widget buildToolbar(
-    BuildContext context,
-    Rect globalEditableRegion,
-    double textLineHeight,
-    Offset position,
-    List<TextSelectionPoint> endpoints,
-    TextSelectionDelegate delegate,
-    ValueListenable<ClipboardStatus>? clipboardStatus,
-    Offset? lastSecondaryTapDownPosition,
-  ) {
+      BuildContext context,
+      Rect globalEditableRegion,
+      double textLineHeight,
+      Offset position,
+      List<TextSelectionPoint> endpoints,
+      TextSelectionDelegate delegate,
+      ValueListenable<ClipboardStatus>? clipboardStatus,
+      Offset? lastSecondaryTapDownPosition,
+      ) {
+    // Calculate position
     final baseOffset = globalEditableRegion.topLeft + position;
     final textSelection = delegate.textEditingValue.selection;
     final originalText = delegate.textEditingValue.text;
 
-    final adjustedIndexes = _adjustSelectionIndexes(
-      originalText,
-      textSelection.start,
-      textSelection.end,
-    );
+    final adjustedIndexes = _adjustSelectionIndexes(originalText, textSelection.start, textSelection.end);
     final adjustedStart = adjustedIndexes['start']!;
     final adjustedEnd = adjustedIndexes['end']!;
     final selectedText = originalText.substring(textSelection.start, textSelection.end);
+
     final isSingle = _isSingleWord(selectedText);
 
     final screenSize = MediaQuery.of(context).size;
@@ -135,11 +148,11 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                       itemBuilder: (context) => [
                         PopupMenuItem(
                           onTap: () {
-                            onSearchInBook(selectedText);
+                            onSearchInContent(selectedText);
                           },
-                          value: 'book',
+                          value: 'content',
                           child: const Text(
-                            'Search in Book',
+                            'Search in content',
                             style: TextStyle(color: Colors.black87, fontSize: 14),
                           ),
                         ),
@@ -183,7 +196,7 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                         delegate.hideToolbar();
 
                         final request = HighlightRequest(
-                          bookId: bookId,
+                          metaData: metaData,
                           pageNumber: pageNumber,
                           fullPageText: fullPageText,
                           startIndex: adjustedStart,
@@ -191,13 +204,11 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                           selectedText: selectedText,
                         );
 
-                        // 1) If the user wants to handle highlight themselves
                         if (onHighlightRequested != null) {
                           onHighlightRequested!(request);
                           return;
                         }
 
-                        // 2) If there's a custom builder for the highlight bottom sheet
                         if (highlightSheetBuilder != null) {
                           showModalBottomSheet(
                             context: context,
@@ -209,14 +220,14 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                           return;
                         }
 
-                        // 3) Otherwise use the default bottom sheet
+                        // default bottom sheet
                         showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
                           builder: (ctx) {
                             return HighlightBottomSheet(
-                              bookId: bookId,
-                              pageNumber: pageNumber,
+                              metaData: metaData,      // replaced
+                              pageNumber: pageNumber,  // still using
                               fullPageText: fullPageText,
                               startIndex: adjustedStart,
                               endIndex: adjustedEnd,
@@ -246,23 +257,6 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                         delegate.hideToolbar();
                       },
                     ),
-                    IconButton(
-                      tooltip: 'Share',
-                      icon: const Icon(Icons.share, color: Colors.white),
-                      onPressed: () async {
-                        // First share entire text
-                        await Share.share(
-                          delegate.textEditingValue.text,
-                          subject: "${bookData['title']}\n\t",
-                        );
-                        // Then share just the selected text
-                        await Share.share(
-                          selectedText,
-                          subject: "${bookData['title']}\n\t",
-                        );
-                        delegate.hideToolbar();
-                      },
-                    ),
                   ],
                 ),
                 InkWell(
@@ -270,7 +264,7 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                     delegate.hideToolbar();
 
                     final request = HighlightRequest(
-                      bookId: bookId,
+                      metaData: metaData, // replaced
                       pageNumber: pageNumber,
                       fullPageText: fullPageText,
                       startIndex: adjustedStart,
@@ -292,12 +286,13 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
                       );
                       return;
                     }
+
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
                       builder: (ctx) {
                         return HighlightBottomSheet(
-                          bookId: bookId,
+                          metaData: metaData,
                           pageNumber: pageNumber,
                           fullPageText: fullPageText,
                           startIndex: adjustedStart,
@@ -332,7 +327,7 @@ class CustomTextSelectionControls extends MaterialTextSelectionControls {
     );
   }
 
-  /// Adjust selection indexes if newlines or some transformation is removed.
+  /// Adjust selection indexes if newlines are removed
   Map<String, int> _adjustSelectionIndexes(String text, int start, int end) {
     int adjustedStart = start;
     int adjustedEnd = end;

@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
 /// A default bottom sheet to handle highlight creation.
-/// If the user does not provide a custom builder or callback,
-/// this sheet is shown.
 class HighlightBottomSheet extends StatefulWidget {
-  final String bookId;
-  final String fullPageText;
+  final dynamic metaData;
   final int pageNumber;
+  final String fullPageText;
   final int startIndex;
   final int endIndex;
   final String selectedText;
+
+  /// Called after highlight is saved
   final VoidCallback onSaved;
 
   const HighlightBottomSheet({
     Key? key,
-    required this.bookId,
-    required this.fullPageText,
+    required this.metaData,
     required this.pageNumber,
+    required this.fullPageText,
     required this.startIndex,
     required this.endIndex,
     required this.selectedText,
@@ -96,7 +96,18 @@ class _HighlightBottomSheetState extends State<HighlightBottomSheet> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
-                // Insert highlight logic here or DB operations
+                // Save highlight logic
+                // metaData can be used if needed
+                // example:
+                // final db = MyDatabase();
+                // db.insertHighlight(
+                //   metaData: widget.metaData,
+                //   page: widget.pageNumber,
+                //   startIndex: widget.startIndex,
+                //   endIndex: widget.endIndex,
+                //   color: selectedColor,
+                //   note: noteController.text,
+                // );
                 widget.onSaved();
                 Navigator.pop(context);
               },
